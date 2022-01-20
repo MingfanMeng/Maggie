@@ -1,0 +1,508 @@
+---
+title: Estimate the correlation between nutrient levels and phytoplankton community
+  structure in 2007 and 2012
+author: "Mingfan Meng"
+date: "3/22/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy.opts = list(width.cutoff = 60), 
+                      tidy = TRUE, fig.width = 8, fig.height = 4, 
+                      table.width = 8, table.height = 4)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(stringr)
+library(sf)
+library(cowplot)  
+library(ggsn) 
+library(rnaturalearth)
+library(gtrendsR) 
+library(rgeos)
+library(pixiedust)
+library(kableExtra)
+library(gt)
+library(ggthemes)
+library(devtools)
+library(beyonce)
+library(wesanderson)
+```
+
+# **I. Introduction**
+
+|    Eutrophication is a major source of pressure on global lakes and coastal marine ecosystems. It can not only increase the growth frequency, duration, and occurrence degree of algal blooms, but also reduce the concentration of dissolved oxygen in lakes (McCrackin, 2017). Additionally, eutrophication reduces water quality and alters ecological structure and function of fresh waters. Eutrophication comes from the higher concentration phytoplankton. According to nutrient inputs from chemical fertilizers used in intensive agricultural practices, the coastal waters have deteriorated (Dodds, 2009). The overload of nutrients caused heavy growth of phytoplankton and macrophytes. That is why exploring the relationship between nutrients components and phytoplankton is important to project. In this project, we are planning to find the association between chemicals such as total nitrogen and total phosphorus and biomass or biovolume of phytoplankton in 2007 and 2012. 
+  
+|    The chemicals (Ie:total nitrogen, total phosphorus, the ratio for total nitrogen and total phosphorus and dissolved oxygen) are the most parts that impacting the biomass of phytoplankton. Lv (2011) did a research about how concentration of total-N and total-P impact the structure of phytoplankton. The result indicated that TP always had higher correlation with chlorophyll a (CHLA) than TN, even though the ratio for TN over TP is really lower. According to the Berthold’s research in 2017, phytoplankton will present P-limited during spring and N-limited during summer, which means that the concentration of total-P and total-N would impact the growth of phytoplankton. He collected about nutrients, biomass and phytoplankton data in Southern German Baltic Sea coast and explore the relationship between chemicals and biomass of phytoplankton. The result shows the concentration of chlorophyll a (CHLA) will be changed over concentration of TN and TP. 
+  
+  
+|    There are two hypothesis this project wanted to discuss:
+  
+1. The concentration of TN and TP will cause the increase of Biovolume of phytoplankton, which means that the biovolume of phytoplankton will also increase and eutrophication will be more severe. 
+2. The heavier eutrophication in lakes near agricultural areas in different states. 
+
+# **II. Approach and Methods**
+
+|    The data we chosen comes from the National Aquatic Resource Surveys (NARS) which is a statistical survey department focusing on assess the status water quality of coastal waters, lakes, and reservoirs, rivers and streams. They tried to use sample sites selected at random and the survey provided a snapshot of the overall condition of the nation’s water. The lake 2007 data was collected in 2007 and integrated in 2009. Meantime, the lake 2012 data was collected in 2012 and integrated in 2014. They choose 124 reference sites in order to reduce the least-disturbed condition vary across regions, which represents that the datasets are reliable. 
+  
+|    However, the metadata need to be cleaned up and it focus on functions which from packages `tidyverse` and `ggpubr`. The steps we are planning to set up are Loading data, Variable selection, Joining database, Exploratory data analysis. Loading data will use the function `read.csv` in `readr` that is included in `tidyverse`. In four datasets I created for the project, it includes lots of variables we do not need (like: Lake sample site, range, panel and etc.).Therefore, the necessary variables are selected from the raw data and it named Variable selection. Variable selection focus on function `select()` in the package `tidyverse`. Selection function would help to choose the useful variables and avoid the messy columns.Combining the above variable selection, it indicated that the variable such as results for each chemicals and the biovolume or abundance are important. Additionally, choosing the same variables in two kind of years also helps us to estimate the accurate results. However, the response variable (biovolume of phytoplankton) and the predictors (chemical results) in the two different dataset. The function `join()` is beneficial to combine the data sets because of the same key in different data. Joining data is the process that is beneficial to make two dataset into one data frame by `left_join()`. Exploratory data analysis is the analysis method to analyzing data sets to summarize their main characteristics (Wikipedia, 2021). Most of time, it is presented by graphics and other data visualization methods. In this project, we choose the R as the main software to explore the data visualization and identify the hypothesis. In this step, we will try to follow function `ggplot()`, `goup_by()`, `summarize()` and etc.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Loading data 
+Ch2007 <- read.csv("./metadata/nla2007c.csv")
+Ph2007 <- read.csv("./metadata/nla2007p.csv")
+Ch2012 <- read.csv("./metadata/nla2012c.csv")
+Ph2012 <- read.csv("./metadata/nla2012p.csv")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Variable selection
+
+CH2007_new <- Ch2007 %>%
+  select(SITE_ID, SITE_TYPE, LAT_DD, LON_DD, ST, EPA_REG, URBAN, PTL, NTL, TURB, ANC, DOC, COND, CHLA) 
+
+PH2007_new <- Ph2007 %>%
+  select(SITE_ID, VISIT_NO, DATE_COL, TAXANAME, ABUND, COUNT, BIOVOLUME, DIVISION, ORDER, FAMILY, GENUS, TAXATYPE)
+
+CH2012_new <- Ch2012 %>%
+  select(UID, DOC_RESULT, NTL_RESULT, PH_RESULT, PTL_RESULT, SILICA_RESULT, SODIUM_RESULT, SULFATE_RESULT, TURB_RESULT)
+
+PH2012_new <- Ph2012 %>%
+  select(PUBLICATION_DATE, UID, SITE_ID, DATE_COL, VISIT_NO, ST_NLA2012, ABUNDANCE, BIOVOLUME, ALGAL_GROUP, TARGET_TAXON, PHYLUM, CLASS, ORDER, FAMILY, GENUS)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Joining data
+Total_2007 <- left_join(CH2007_new, PH2007_new, by = "SITE_ID")
+
+Total_2012 <- left_join(PH2012_new, CH2012_new, by = "UID")
+Total_2012$ST<- Total_2012$ST_NLA2012
+Total_2012 <- Total_2012%>%
+  select(-ST_NLA2012)
+```
+
+  
+# **III. Result**
+
+### *1. Testing the richness for different phytoplankton*
+  
+  
+```{r,  warning=FALSE, message=FALSE}
+# We choose the Biovolume as the response variables find the distribution in 2007 and 2012
+
+P1<- Total_2007 %>%
+  filter(! is.na(BIOVOLUME)) %>%
+  ggplot(mapping = aes(x = TAXATYPE, y = BIOVOLUME)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() + 
+  xlab("phytoplankton") +
+  ylab("Biolvolume") +
+  ggtitle("The distrubution of Phytoplankton in 2007") +
+  theme(axis.text.x = element_text(angle = 15))
+
+P2<- Total_2012 %>%
+  filter(!is.na(BIOVOLUME)) %>%
+  mutate(ALGAL_GROUP = str_to_lower(ALGAL_GROUP)) %>%
+  ggplot(mapping = aes(x = ALGAL_GROUP, y = BIOVOLUME)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() + 
+  xlab("phytoplankton") +
+  ylab("Biolvolume") +
+  ggtitle("The distrubution of Phytoplankton in 2012") +
+  theme(axis.text.x = element_text(angle = 15))
+
+ggarrange(P1, P2, ncol = 1, nrow = 2)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(rnaturalearthdata)
+library(rnaturalearthhires)
+world <- ne_countries(scale = "medium", returnclass = "sf")
+usa <- ne_states(country = "united states of america", returnclass = "sf")
+usa_48 <- usa %>% filter(name %in% c("Hawaii", "Alaska")==FALSE)
+al_point <- data.frame(long = Total_2007$LON_DD, lat = Total_2007$LAT_DD)
+ggplot(usa_48) +
+  geom_sf() +
+  geom_point(data = al_point, color = "blue", shape = 17, size = 1, 
+             aes(x = long, y = lat)) +
+  ggtitle("The distribution of phytoplankton in the US") +
+  xlab("Longtitude") + 
+  ylab("Latitude") +
+  theme_minimal()
+
+
+```
+
+|    Combining these three plots, the most three abundant phytoplanktons are green algae, dinoflagellate, and blue-green algal. Comparing the distribution of phytoplankton in 2007 and 2012, it indicated that the richness of blue-green algae is increasing whereas the Dinoflagellate and green algae is decreasing from 2007 to 2012. 
+  
+|    According to the map graph, It shows that algae are more abundant in the central and eastern regions than in the western regions. Meantime, it indicated that the distribution of algae are concentrated in Great Lakes region that in Northern. Combined with the analysis of the geographical location, it presents that these region has very frequent agricultural activities  which causing serious eutrophication. 
+
+
+### *2. The total Nitrogen concentration*
+
+
+```{r, warning=FALSE, message=FALSE}
+base_size = 12
+base_family = "sans"
+Total_2007%>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 200000) %>%
+  mutate(NTL = NTL/1000) %>%
+  filter(NTL < 8) %>%
+  ggplot(mapping = aes(x = NTL, y = BIOVOLUME)) +
+  geom_point(mapping = aes(color = TAXATYPE)) +
+  theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), 
+        axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), axis.title = element_text(size = ceiling(base_size * 
+            0.8)), panel.grid.minor = element_blank(), 
+        panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), panel.grid.major.x = element_blank(), 
+            panel.background = element_blank(), panel.border = element_blank(), 
+            strip.background = element_rect(linetype = 0), strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), 
+        plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05))) +
+  xlab("Total Nitrogen Concentration") +
+  ylab("Biovolume of Phytoplankton") +
+  ggtitle("The trend of phytoplankton with the total nitrogen concentration in 2007")
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+base_size = 12
+base_family = "sans"
+Total_2012%>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 200000) %>%
+  filter(NTL_RESULT < 8) %>%
+  ggplot(mapping = aes(x = NTL_RESULT, y = BIOVOLUME)) +
+  geom_point(mapping = aes(color = ALGAL_GROUP)) +
+  theme_minimal() +
+  xlab("Total Nitrogen Concentration") +
+  ylab("Biovolume of Phytoplankton") +
+  ggtitle("The trend of phytoplankton with the total nitrogen concentration in 2012") +
+  theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), 
+        axis.title = element_text(size = ceiling(base_size * 
+            0.8)), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), 
+        panel.grid.major.x = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(), 
+        strip.background = element_rect(linetype = 0), 
+        strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), 
+        strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), 
+        plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05)))
+```
+
+|    As these two figures shown, the higher concentration of total nitrogen(TN) cause the lower biovolume of phytoplankton. The total nitrogen concentration acceptable to most phytoplankton ranges from 0mg/L to 4mg/L, and the biovolume decrease when the total nitrogen concentration is higher in the environment. 
+
+  
+### *3. The total Phosphorus concentration*
+
+```{r, warning=FALSE, message=FALSE}
+base_size = 12
+base_family = "sans"
+Total_2007%>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 200000) %>%
+  filter(PTL<2000) %>%
+  ggplot(mapping = aes(x = PTL, y = BIOVOLUME)) +
+  geom_smooth(se = FALSE) +
+  geom_point(mapping = aes(color = TAXATYPE)) +
+   theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), axis.title = element_text(size = ceiling(base_size * 
+            0.8)), panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), panel.grid.major.x = element_blank(), 
+            panel.background = element_blank(), panel.border = element_blank(), 
+            strip.background = element_rect(linetype = 0), strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05))) +
+  xlab("Total Phosphorus Concentration") +
+  ylab("Biovolume of Phytoplankton") +
+  ggtitle("The trend of phytoplankton with the total phosphorus concentration in 2007")
+```
+  
+  
+```{r, warning=FALSE, message=FALSE}
+base_size = 12
+base_family = "sans"
+
+Total_2012%>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 200000) %>%
+  ggplot(mapping = aes(x = PTL_RESULT, y = BIOVOLUME)) +
+  geom_point(mapping = aes(color = ALGAL_GROUP)) +
+  geom_smooth(se = F) +
+  theme_minimal() +
+  xlab("Total Phosphorus Concentration") +
+  ylab("Biovolume of Phytoplankton") +
+  ggtitle("The trend of phytoplankton with the total phosphorus concentration in 2012") +
+  theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), axis.title = element_text(size = ceiling(base_size * 
+            0.8)), panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), panel.grid.major.x = element_blank(), 
+            panel.background = element_blank(), panel.border = element_blank(), 
+            strip.background = element_rect(linetype = 0), strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05)))
+```
+  
+   
+|    Same as the relationship between total nitrogen concentration and biovolume, the most of phytoplankton are concentrated between 0 mg/L and 1000 mg/L. Sommth lines shows there are moderate positive relationship between TN and biovolume in 2007 and 2012. 
+  
+### *4. The ratio of TN:TP*
+  
+  
+```{r, warning=FALSE, message=FALSE}
+Total_2007%>%
+   mutate(ratio = NTL/PTL) %>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 100000) %>%
+  filter(ratio <35) %>%
+  ggplot(mapping = aes(x = TAXATYPE, y = ratio, fill = TAXATYPE)) +
+  geom_boxplot() +
+  theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), axis.title = element_text(size = ceiling(base_size * 
+            0.8)), panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), panel.grid.major.x = element_blank(), 
+            panel.background = element_blank(), panel.border = element_blank(), 
+            strip.background = element_rect(linetype = 0), strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05))) +
+  xlab("Algae Group") +
+  ylab("Ratio of TN/TP") +
+  ggtitle("The trend of phytoplankton with TN/TP in 2007") +
+  theme(axis.text.x = element_text(angle = 15))
+```
+  
+  
+```{r, warning=FALSE, message=FALSE}
+Total_2012%>%
+  mutate(ALGAL_GROUP = str_to_lower(ALGAL_GROUP)) %>%
+   mutate(ratio = (1000*NTL_RESULT)/PTL_RESULT) %>%
+  filter(!is.na(BIOVOLUME)) %>%
+  filter(BIOVOLUME < 100000) %>%
+  filter(ratio <35) %>%
+  ggplot(mapping = aes(x = ALGAL_GROUP, y = ratio, fill = ALGAL_GROUP)) +
+  geom_boxplot() +
+  theme(axis.line.x = element_line(colour = "black", size = 0.5, 
+            linetype = "solid"), axis.line.y = element_line(colour = "black", 
+            size = 0.5, linetype = "solid"), axis.text = element_text(size = ceiling(base_size * 
+            0.7), colour = "black"), axis.title = element_text(size = ceiling(base_size * 
+            0.8)), panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "gray", 
+            linetype = "dotted"), panel.grid.major.x = element_blank(), 
+            panel.background = element_blank(), panel.border = element_blank(), 
+            strip.background = element_rect(linetype = 0), strip.text = element_text(), 
+            strip.text.x = element_text(vjust = 0.5), strip.text.y = element_text(angle = -90), 
+            legend.text = element_text(size = ceiling(base_size * 
+                0.9), family = "sans"), legend.title = element_text(size = base_size, 
+                face = "bold", family = "sans"), legend.position = "right", 
+            legend.key = element_rect(fill = "white", colour = NA), 
+            legend.background = element_rect(colour = "black"), 
+            plot.background = element_rect(colour = "black"), 
+            plot.title = element_text(size = ceiling(base_size * 
+                1.1), face = "bold"), plot.subtitle = element_text(size = ceiling(base_size * 
+                1.05))) +
+  xlab("Algae Group") +
+  ylab("Ratio of TN/TP") +
+  ggtitle("The trend of phytoplankton with TN/TP in 2007")+
+  theme(axis.text.x = element_text(angle = 15))
+```
+
+|    According to Abell’s (2010) research paper, there is potential P-limitation when the ratio of TN to TP is greater than 15:1; there is potential N-limitation when the ratio of TN to TP is less than 7:1. Following these two graphs, Dinoflagellate has higher P-limitation in 2007. In 2012, the golden algae also is limited by phosphorus. 
+  
+### *5. The tropical status distribution in the US*
+
+```{r, warning=FALSE, message=FALSE}
+Total_2007 %>%
+  group_by(ST) %>%
+  summarise(`Ave Total N` = mean(NTL),
+            `Ave Total P` = mean(PTL),
+            Biovolume = mean(BIOVOLUME, na.rm = TRUE),
+            `The ratio TN/TP` = `Ave Total N`/`Ave Total P`) %>%
+  select(ST, Biovolume, `The ratio TN/TP`) %>%
+  arrange(desc(`The ratio TN/TP`)) -> table1 
+
+Total_2012 %>%
+  group_by(ST) %>%
+  summarise(`Ave TotalN` = mean(NTL_RESULT, na.rm = TRUE) * 1000,
+            `Ave TotalP` = mean(PTL_RESULT, na.rm = TRUE),
+            `The ratio of TN/TP` = `Ave TotalN`/`Ave TotalP`, 
+            Biovolume = mean(BIOVOLUME, na.rm = TRUE)) %>%
+  select(ST, Biovolume, `The ratio of TN/TP`) -> table2 
+
+table_new <- left_join(table1, table2, by = "ST")
+
+table_new%>%
+  gt() %>%
+  tab_header(title = md("Summary in 2007 and 2012"),
+             subtitle = md("The ratio and Biovolume")
+             ) %>%
+    fmt_number(
+    columns = c("The ratio TN/TP", "The ratio of TN/TP"),
+    decimals = 1
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "lightcyan"),
+      cell_text(weight = "bold")
+      ),
+    locations = cells_body(
+      columns = "The ratio of TN/TP",
+      rows = `The ratio of TN/TP` > 15
+    )
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "#F9E3D6"),
+      cell_text(style = "italic")
+      ),
+    locations = cells_body(
+      columns = "The ratio TN/TP",
+      rows = `The ratio TN/TP` > 15
+    )
+  )
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+coeff <- 100000
+ratioColor <- "#69b3a2"
+lineColor <- rgb(0.2, 0.6, 0.9, 1)
+table1%>%
+  ggplot(mapping = aes(x = ST)) +
+  geom_bar(aes(y = `The ratio TN/TP`, fill = `The ratio TN/TP`), 
+           stat = "identity", size=.1, fill=ratioColor, color="white", alpha=.4) +
+  geom_bar(aes(y = Biovolume / coeff), size=2, color= lineColor,stat = "identity", alpha = .6)+
+  scale_y_continuous(
+    name = "The ratio TN/TP",
+    sec.axis = sec_axis(~ .*coeff, name = "Biovolume" ))+
+  theme_bw() +
+   theme(axis.text.x = element_text(angle = 15)) + 
+  ggtitle("The ratio of TN/TP and Biovolume in different state in 2007")
+  
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+ratioColor1 <- "#C45DCB"
+table2%>%
+  ggplot(mapping = aes(x = ST)) +
+  geom_bar(aes(y = `The ratio of TN/TP`, fill = `The ratio of TN/TP`), 
+           stat = "identity", size=.1, fill=ratioColor1, color="black", alpha=.4) +
+  geom_bar(aes(y = Biovolume / coeff, color = Biovolume / coeff), size=2, 
+           color= "purple",stat = "identity", alpha = .6)+
+  scale_y_continuous(
+    name = "The ratio of TN/TP",
+    sec.axis = sec_axis(~ .*coeff, name = "Biovolume" ))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 15)) +
+  ggtitle("The ratio of TN/TP and Biovolume in different state in 2012")
+```
+
+|    Above figures and tables clearly shown that some states like Vermont, Michigan which in the North American. These state are commonly concentrated on the agricultural activities and lots of industry factories are built in these area. The highest ratio of TN to TP was 45.4 in Vermont and the second highest in Michigan.Compared with concentration of total nitrogen and total phosphor, the ratio in 2012 is obviously decrease because of the environmental improvement. Additionally, the biovolume of phytoplankton in Mississippi River is usually higher than other lakes, which means these place has serious eutrophication situation.
+
+
+# **IV. Discussion**
+
+|    Nitrogen has often regarded as the critical limiting nutrient of phytoplankton (Nielsen, 2002). The results showed that the Dinoflagellate is highly influenced by nutrition status. In this state, there are higher nutrient levels of nitrogen and phosphorus. The nutrient levels were generally as high as those found in eutrophic lakes. There were strong positive correlations between biovolume and both total nitrogen and phosphorus levels, underling the importance of agricultural runoff. What is more, lake total phosphorus concentration does play a role in determining biovolume of phytoplankton. Phosphorus-enriched lakes have abundant phytoplankton blooms than nutrient-poor lakes of a similar length (Bowes, 2012).  
+
+
+
+|     Generally, we can find that with an increased ratio of TN to TP, the biovolume of phytoplankton is lower. It also means that Nitrogen has a more influential role in lake eutrophication. In this project, TN is significantly better correlated than TP with biovolume of phytoplankton. This means TN has much more influence on the change of biovolume of phytoplankton. Combining the two individual figure for total nitrogen concentration and total phosphor concentration in two different year, it shows that the biovolume will decrease  with the increased concentration.   
+
+
+|     Some limitation also are presented in this project. The biovolume of different phytoplankton species varies greatly, so we cannot accurately compare the significance and correlation between species. Secondly, We can only extract the data from 2007 and 2012, so we cannot study the detailed development trend of phytoplankton nutrition structure and river eutrophication over the time period. The only thing I can do is making a rough estimate of what's going on over these two years. However, it will be errors between the estimation and the real data analysis, which will affect the final analysis results. The furthermore information and analysis should also be explored in the future.   
+
+
+# **V. Literature cited**
+
+[1]. Abell, J. M., Özkundakci, D., & Hamilton, D. P. (2010). Nitrogen and phosphorus limitation of phytoplankton growth in New Zealand lakes: implications for eutrophication control. Ecosystems, 13(7), 966-977.
+
+[2]. Bowes, M. J., Gozzard, E., Johnson, A. C., Scarlett, P. M., Roberts, C., Read, D. S., ... & Wickham, H. D. (2012). Spatial and temporal changes in chlorophyll-a concentrations in the River Thames basin, UK: are phosphorus concentrations beginning to limit phytoplankton biomass?. Science of the Total Environment, 426, 45-55.
+
+[3]. Boyer, K. (2009). Phytoplankton bloom status: Chlorophyll a biomass as an indicator of water quality condition in the southern estuaries of Florida, USA. Ecological Indicators, 9(6), S56–S67. https://doi.org/10.1016/j.ecolind.2008.11.013
+
+[4]. Data from the National Aquatic Resource Surveys. (2019, July 31). Retrieved December 06, 2020, from https://www.epa.gov/national-aquatic-resource-surveys/data-national-aquatic-resource-surveys
+
+[5]. "Lengths of the major rivers". United States Geological Survey. Archived from the original on March 5, 2009. Retrieved March 14, 2009
+
+[6]. Marisol Felip, Jordi Catalan, The relationship between phytoplankton biovolume and chlorophyll in a deep oligotrophic lake: decoupling in their spatial and temporal maxima, Journal of Plankton Research, Volume 22, Issue 1, January 2000, Pages 91–106, https://doi.org/10.1093/plankt/22.1.91
+
+[7]. McCrackin, J. (2017). Recovery of lakes and coastal marine ecosystems from eutrophication: A global meta-analysis. Limnology and Oceanography, 62(2), 507–518. https://doi.org/10.1002/lno.10441
+
+[8]. Nielsen, S. L., Sand-Jensen, K., Borum, J., & Geertz-Hansen, O. (2002). Phytoplankton, nutrients, and transparency in Danish coastal waters. Estuaries, 25(5), 930-937.
+
+[9]. Sylvan, D. (2006). Phosphorus Limits Phytoplankton Growth on the Louisiana Shelf During the Period of Hypoxia Formation. Environmental Science & Technology, 40(24), 7548–7553. https://doi.org/10.1021/es061417t
+
+[10]. USEPA. (2017). National Lakes Assessment 2012: Techical Report. EPA 841-R-16-114. U.S. Environmental Protection Agency, Washington, D.C.
+
+[11]. W. H., Kulk, G., Timmermans, K. R., Brussaard, C. P. D., van der Woerd, H. J., Kehoe, M. J., … Buma, A. G. J. (2013). Phytoplankton chlorophyll a; biomass, composition, and productivity along a temperature and stratification gradient in the northeast Atlantic Ocean. Biogeosciences, 10(6), 4227–4240. https://doi.org/10.5194/bg-10-4227-2013
+
+[12]. Zang, C., Huang, S., Wu, M., Du, S., Scholz, M., Gao, F., ... & Dong, Y. (2011). Comparison of relationships between pH, dissolved oxygen and chlorophyll a for aquaculture and non-aquaculture waters. Water, Air, & Soil Pollution, 219(1-4), 157-174.
+
+
